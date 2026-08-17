@@ -14,3 +14,4 @@ dependencies = [
 
 [tool.vercel]
 entrypoint = "backend.app:app"
+ 
