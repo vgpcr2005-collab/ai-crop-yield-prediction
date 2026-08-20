@@ -10,6 +10,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import sys
+from dotenv import load_dotenv
 
 # Add services to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'services'))
@@ -23,11 +24,11 @@ except ImportError as e:
     WeatherService = None
 
 try:
-    from auth_service import OTPService, UserService
+    from auth_service import EmailCodeService, UserService
     print("✓ AuthService imported")
 except ImportError as e:
     print(f"⚠️ AuthService import failed: {e}")
-    OTPService = None
+    EmailCodeService = None
     UserService = None
 
 try:
@@ -45,16 +46,14 @@ BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BACKEND_DIR)
 MODEL_DIR = os.path.join(BACKEND_DIR, 'models')
 DATASET_PATH = os.path.join(PROJECT_ROOT, 'dataset', 'crop_yield_data.csv')
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
 # Initialize services
-otp_service = None
+email_code_service = None
 user_service = None
 
-if OTPService:
-    try:
-        otp_service = OTPService()
-    except Exception as e:
-        print(f"⚠️ OTPService initialization failed: {e}")
+if EmailCodeService:
+    email_code_service = EmailCodeService()
 
 if UserService:
     try:
@@ -540,53 +539,35 @@ def calculate_crop_suitability_detailed(crop, rainfall, temperature, humidity):
     return max(10, min(100, score))
 
 # ============================================
-# AUTHENTICATION ENDPOINTS (Phone + OTP)
+# AUTHENTICATION ENDPOINTS (Email Verification)
 # ============================================
 
-@app.route('/api/auth/send-otp', methods=['POST'])
-def send_otp():
-    """Send OTP to phone number"""
+@app.route('/api/auth/send-email-code', methods=['POST'])
+def send_email_code():
     try:
-        if not otp_service:
-            return jsonify({'status': 'error', 'message': 'OTP service not initialized'}), 500
-        
         data = request.json or {}
-        phone_number = data.get('phone')
-        
-        if not phone_number:
-            return jsonify({'status': 'error', 'message': 'Phone number is required'}), 400
-        
-        result = otp_service.generate_otp(phone_number)
-        return jsonify(result)
-    
+        email = str(data.get('email', '')).strip().lower()
+        if not email or '@' not in email:
+            return jsonify({'status': 'error', 'message': 'Valid email address is required'}), 400
+        if user_service.get_user_by_email(email)['status'] != 'success':
+            return jsonify({'status': 'error', 'message': 'Email is not registered. Please register first.'}), 404
+        return jsonify(email_code_service.generate_code(email))
     except Exception as e:
-        print(f"Error in send_otp: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/api/auth/verify-otp', methods=['POST'])
-def verify_otp():
-    """Verify OTP and get session token"""
+@app.route('/api/auth/verify-email-code', methods=['POST'])
+def verify_email_code():
     try:
         data = request.json or {}
-        phone_number = data.get('phone')
-        otp = data.get('otp')
-        
-        if not phone_number or not otp:
-            return jsonify({'status': 'error', 'message': 'Phone and OTP are required'}), 400
-        
-        result = otp_service.verify_otp(phone_number, otp)
-        
+        email = str(data.get('email', '')).strip().lower()
+        code = data.get('code')
+        result = email_code_service.verify_code(email, code)
         if result['status'] == 'success':
-            # Create session
-            session['phone'] = phone_number
+            session['email'] = email
             session['verified'] = True
-            
-            # Get user info
-            user_result = user_service.get_user(phone_number)
+            user_result = user_service.get_user_by_email(email)
             result['user'] = user_result.get('user')
-        
         return jsonify(result)
-    
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -595,20 +576,18 @@ def register():
     """Register new user"""
     try:
         data = request.json or {}
-        phone = data.get('phone')
         name = data.get('name')
         email = data.get('email')
         
-        if not all([phone, name, email]):
-            return jsonify({'status': 'error', 'message': 'Phone, name, and email are required'}), 400
+        if not all([name, email]):
+            return jsonify({'status': 'error', 'message': 'Name and email are required'}), 400
         
-        result = user_service.register_user(phone, name, email)
+        result = user_service.register_email_user(name, email)
         
         if result['status'] == 'success':
-            # Send OTP after registration
-            otp_result = otp_service.generate_otp(phone)
-            result['otp_sent'] = True
-            result['otp_message'] = otp_result['message']
+            code_result = email_code_service.generate_code(email)
+            result['code_sent'] = True
+            result['code_message'] = code_result['message']
         
         return jsonify(result)
     
@@ -619,11 +598,11 @@ def register():
 def get_user():
     """Get current user info"""
     try:
-        phone = session.get('phone')
-        if not phone:
+        email = session.get('email')
+        if not email:
             return jsonify({'status': 'error', 'message': 'Not authenticated'}), 401
         
-        result = user_service.get_user(phone)
+        result = user_service.get_user_by_email(email)
         return jsonify(result)
     
     except Exception as e:

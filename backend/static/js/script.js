@@ -1,12 +1,20 @@
 // JavaScript for AgriAI Application
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = '/api';
+
+function normalizePhoneNumber(phone) {
+    const trimmed = phone.trim();
+    if (/^\d{10}$/.test(trimmed)) {
+        return `+91${trimmed}`;
+    }
+    return trimmed;
+}
 
 // ============================================
 // AUTHENTICATION FUNCTIONS
 // ============================================
 
-let currentPhone = null;
+let currentEmail = null;
 
 function switchAuthTab(tab) {
     // Hide all tabs
@@ -24,28 +32,28 @@ function switchAuthTab(tab) {
     event.target.classList.add('active');
 }
 
-async function sendOTP() {
+async function sendEmailCode() {
     try {
-        const phone = document.getElementById('loginPhone').value.trim();
+        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
         
-        if (!phone) {
-            showAuthError('Please enter a phone number');
+        if (!email) {
+            showAuthError('Please enter your Gmail address');
             return;
         }
         
-        const response = await fetch(`${API_BASE_URL}/auth/send-otp`, {
+        const response = await fetch(`${API_BASE_URL}/auth/send-email-code`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone })
+            body: JSON.stringify({ email })
         });
         
         const result = await response.json();
         
         if (result.status === 'success') {
-            currentPhone = phone;
-            document.getElementById('otpSection').classList.remove('hidden');
+            currentEmail = email;
+            document.getElementById('emailCodeSection').classList.remove('hidden');
             showAuthError(''); // Clear errors
-            console.log('OTP:', result.otp, '- Demo Mode (Check Console)');
+            console.log(result.message);
         } else {
             showAuthError(result.message || 'Error sending OTP');
         }
@@ -54,27 +62,27 @@ async function sendOTP() {
     }
 }
 
-async function verifyOTP() {
+async function verifyEmailCode() {
     try {
-        const phone = currentPhone;
-        const otp = document.getElementById('loginOTP').value.trim();
+        const email = currentEmail;
+        const code = document.getElementById('loginEmailCode').value.trim();
         
-        if (!otp || otp.length !== 6) {
-            showAuthError('Please enter a 6-digit OTP');
+        if (!code || code.length !== 6) {
+            showAuthError('Please enter the 6-digit email code');
             return;
         }
         
-        const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+        const response = await fetch(`${API_BASE_URL}/auth/verify-email-code`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, otp })
+            body: JSON.stringify({ email, code })
         });
         
         const result = await response.json();
         
         if (result.status === 'success') {
             console.log('Login successful!', result.user);
-            localStorage.setItem('phone', phone);
+            localStorage.setItem('email', email);
             localStorage.setItem('user', JSON.stringify(result.user));
             
             // Hide auth modal
@@ -90,20 +98,20 @@ async function verifyOTP() {
     }
 }
 
-function resetOTP() {
-    document.getElementById('loginOTP').value = '';
-    document.getElementById('otpSection').classList.add('hidden');
-    document.getElementById('loginPhone').value = '';
-    currentPhone = null;
+function resetEmailCode() {
+    document.getElementById('loginEmailCode').value = '';
+    document.getElementById('emailCodeSection').classList.add('hidden');
+    document.getElementById('loginEmail').value = '';
+    currentEmail = null;
 }
 
 async function registerUser() {
     try {
         const name = document.getElementById('regName').value.trim();
         const email = document.getElementById('regEmail').value.trim();
-        const phone = document.getElementById('regPhone').value.trim();
+        const phone = '';
         
-        if (!name || !email || !phone) {
+        if (!name || !email) {
             showAuthError('All fields are required');
             return;
         }
@@ -118,15 +126,15 @@ async function registerUser() {
         
         if (result.status === 'success') {
             showAuthError('');
-            alert('Registration successful! OTP sent to ' + phone);
+            alert('Registration successful! A verification code was sent to ' + email);
             
             // Switch to login tab and populate phone
             switchAuthTab('login');
-            document.getElementById('loginPhone').value = phone;
+            document.getElementById('loginEmail').value = email;
             
             // Auto-send OTP
-            currentPhone = phone;
-            document.getElementById('otpSection').classList.remove('hidden');
+            currentEmail = email;
+            document.getElementById('emailCodeSection').classList.remove('hidden');
         } else {
             showAuthError(result.message || 'Registration failed');
         }

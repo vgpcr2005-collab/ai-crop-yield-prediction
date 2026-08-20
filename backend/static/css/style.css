@@ -1,4 +1,6 @@
-/* CSS Styling for AgriAI Application - Modern Dark Theme */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+/* CSS Styling for AgriAI Application */
 
 * {
     margin: 0;
@@ -955,5 +957,325 @@ body {
 
     .location-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Field instrument visual refresh */
+:root {
+    --primary-color: #b8d96b;
+    --secondary-color: #6fc3b2;
+    --accent-color: #f0a35b;
+    --success-color: #8bcf83;
+    --warning-color: #f0b35b;
+    --danger-color: #e77a6d;
+    --dark-bg: #101713;
+    --dark-card: #19231c;
+    --dark-border: #344238;
+    --light-text: #f2f1e8;
+    --muted-text: #aeb9a8;
+    --gradient-1: linear-gradient(110deg, #b8d96b 0%, #6fc3b2 100%);
+    --gradient-2: linear-gradient(110deg, #f0a35b 0%, #d87955 100%);
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'DM Sans', sans-serif;
+    background-color: var(--dark-bg);
+    background-image:
+        linear-gradient(rgba(184, 217, 107, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(184, 217, 107, 0.035) 1px, transparent 1px),
+        radial-gradient(circle at 8% 8%, rgba(111, 195, 178, 0.16), transparent 28rem),
+        radial-gradient(circle at 92% 84%, rgba(240, 163, 91, 0.12), transparent 24rem);
+    background-size: 44px 44px, 44px 44px, auto, auto;
+    background-attachment: fixed;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(120deg, transparent 0 48%, rgba(242, 241, 232, 0.025) 49%, transparent 50% 100%);
+    background-size: 18rem 18rem;
+    opacity: 0.35;
+    z-index: -1;
+}
+
+h1, h2, h3, h4, .nav-logo {
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 0;
+}
+
+.navbar {
+    background: rgba(16, 23, 19, 0.84);
+    border-bottom: 1px solid rgba(184, 217, 107, 0.24);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(18px);
+}
+
+.nav-logo {
+    color: var(--light-text);
+    background: none;
+    -webkit-text-fill-color: initial;
+    font-size: 1.35rem;
+}
+
+.nav-logo::first-letter {
+    color: var(--primary-color);
+}
+
+.nav-link {
+    color: var(--muted-text);
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.nav-link::before {
+    background: rgba(184, 217, 107, 0.14);
+    border-radius: 6px;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    color: var(--primary-color);
+}
+
+.container {
+    max-width: 1240px;
+    padding: 1.5rem 2rem 3rem;
+}
+
+.section {
+    background: rgba(25, 35, 28, 0.86);
+    border: 1px solid rgba(174, 185, 168, 0.16);
+    border-radius: 10px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+}
+
+.section.active {
+    animation: sectionReveal 0.55s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@keyframes sectionReveal {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.section h2,
+.location-container h3 {
+    color: var(--light-text);
+    background: none;
+    -webkit-text-fill-color: initial;
+    border-bottom-color: rgba(184, 217, 107, 0.22);
+}
+
+.hero {
+    position: relative;
+    padding: 4.5rem 1rem 3.5rem;
+    overflow: hidden;
+}
+
+.hero::after {
+    content: 'FIELD / SIGNAL / YIELD';
+    position: absolute;
+    top: 1.5rem;
+    right: 1rem;
+    color: rgba(184, 217, 107, 0.45);
+    font: 600 0.68rem 'Space Grotesk', sans-serif;
+    letter-spacing: 0.18em;
+}
+
+.hero h1 {
+    max-width: 780px;
+    margin: 0 auto 0.7rem;
+    color: var(--light-text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(2.2rem, 6vw, 4.6rem);
+    line-height: 0.98;
+}
+
+.hero h2 {
+    color: var(--primary-color);
+    background: none;
+    -webkit-text-fill-color: initial;
+    font-size: clamp(1.1rem, 2vw, 1.55rem);
+}
+
+.tagline {
+    max-width: 520px;
+    margin: 1.4rem auto 0;
+    color: var(--muted-text);
+    font-size: 1rem;
+}
+
+.features {
+    gap: 1rem;
+    margin: 3rem 0;
+}
+
+.feature-card,
+.result-card,
+.opt-card,
+.chart-container,
+.stats-container {
+    background: rgba(16, 23, 19, 0.66);
+    border: 1px solid rgba(174, 185, 168, 0.16);
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.feature-card {
+    padding: 2rem 1.5rem;
+    text-align: left;
+}
+
+.feature-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 2px;
+    background: var(--gradient-1);
+    transform: scaleX(0.2);
+    transform-origin: left;
+    transition: transform 0.35s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(184, 217, 107, 0.5);
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
+}
+
+.feature-card:hover::before {
+    transform: scaleX(1);
+}
+
+.feature-emoji {
+    font-size: 2.4rem;
+}
+
+.form-container,
+.recommendations-container {
+    background: rgba(16, 23, 19, 0.5);
+    border: 1px solid rgba(174, 185, 168, 0.15);
+    border-radius: 8px;
+}
+
+.form-group input,
+.form-group select,
+.auth-form input {
+    background: rgba(10, 15, 12, 0.7);
+    border: 1px solid #3b4b3d;
+    border-radius: 6px;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.auth-form input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(184, 217, 107, 0.12);
+}
+
+.btn {
+    border-radius: 6px;
+    letter-spacing: 0.01em;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: #162016;
+    box-shadow: 0 8px 22px rgba(184, 217, 107, 0.16);
+}
+
+.btn-primary:hover {
+    box-shadow: 0 12px 28px rgba(184, 217, 107, 0.28);
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--accent-color);
+    border: 1px solid rgba(240, 163, 91, 0.55);
+    box-shadow: none;
+}
+
+.btn-secondary:hover {
+    background: rgba(240, 163, 91, 0.1);
+    box-shadow: 0 10px 24px rgba(240, 163, 91, 0.12);
+}
+
+.yield-value,
+.suitability-score,
+.soil-health-score,
+.improvement-value,
+.optimal-value,
+.stat-value {
+    color: var(--primary-color);
+    background: none;
+    -webkit-text-fill-color: initial;
+}
+
+.recommendation-item,
+.crop-recommendation {
+    background: rgba(10, 15, 12, 0.56);
+    border-radius: 6px;
+}
+
+.auth-modal,
+.location-section {
+    background: rgba(8, 12, 9, 0.82);
+    backdrop-filter: blur(14px);
+}
+
+.auth-container,
+.location-container {
+    background: #19231c;
+    border: 1px solid rgba(184, 217, 107, 0.28);
+    border-radius: 10px;
+    box-shadow: 0 26px 80px rgba(0, 0, 0, 0.46);
+}
+
+.auth-header h1 {
+    color: var(--light-text);
+    background: none;
+    -webkit-text-fill-color: initial;
+}
+
+.auth-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.auth-error {
+    background: rgba(231, 122, 109, 0.1);
+    border-left-color: var(--danger-color);
+    color: #f2b0a7;
+}
+
+.footer {
+    background: transparent;
+    color: var(--muted-text);
+    border-top-color: rgba(174, 185, 168, 0.14);
+}
+
+@media (max-width: 768px) {
+    .container { padding: 1rem 1rem 2rem; }
+    .section { padding: 1.25rem; margin: 1rem 0; }
+    .hero { padding: 3.5rem 0.3rem 2.5rem; }
+    .hero::after { position: static; display: block; margin-top: 2rem; }
+    .nav-container { padding: 0 1rem; }
+    .nav-logo { width: 100%; margin-bottom: 0.5rem; }
+    .nav-menu { justify-content: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }

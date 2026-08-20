@@ -18,29 +18,29 @@
         <!-- Login Tab -->
         <div id="loginTab" class="auth-tab-content active">
             <form class="auth-form" id="loginForm">
-                <div class="form-group">
-                    <label>📱 Phone Number</label>
-                    <input type="tel" id="loginPhone" placeholder="+91 XXXXXXXXXX" required>
+                    <div class="form-group">
+                        <label>📧 Gmail Address</label>
+                        <input type="email" id="loginEmail" placeholder="you@gmail.com" required>
                 </div>
 
-                <button type="button" class="btn btn-primary full-width" onclick="sendOTP()">
-                    Send OTP
+                <button type="button" class="btn btn-primary full-width" onclick="sendEmailCode()">
+                    Send Email Code
                 </button>
 
-                <div id="otpSection" class="hidden">
-                    <div class="divider">OTP Sent</div>
+                <div id="emailCodeSection" class="hidden">
+                    <div class="divider">Verification Email Sent</div>
                     
                     <div class="form-group">
-                        <label>🔐 Enter OTP</label>
-                        <input type="text" id="loginOTP" placeholder="000000" maxlength="6" required>
+                        <label>🔐 Enter Verification Code</label>
+                        <input type="text" id="loginEmailCode" placeholder="000000" maxlength="6" required>
                     </div>
 
-                    <button type="button" class="btn btn-primary full-width" onclick="verifyOTP()">
+                    <button type="button" class="btn btn-primary full-width" onclick="verifyEmailCode()">
                         Verify & Login
                     </button>
 
-                    <button type="button" class="btn btn-secondary full-width" onclick="resetOTP()">
-                        Send New OTP
+                    <button type="button" class="btn btn-secondary full-width" onclick="resetEmailCode()">
+                        Send New Code
                     </button>
                 </div>
             </form>
@@ -59,17 +59,12 @@
                     <input type="email" id="regEmail" placeholder="your@email.com" required>
                 </div>
 
-                <div class="form-group">
-                    <label>📱 Phone Number</label>
-                    <input type="tel" id="regPhone" placeholder="+91 XXXXXXXXXX" required>
-                </div>
-
                 <button type="button" class="btn btn-primary full-width" onclick="registerUser()">
-                    Register
+                    Register & Verify Email
                 </button>
 
                 <p class="auth-info">
-                    By registering, you'll receive an OTP to verify your account
+                    A free verification code will be sent to your email address
                 </p>
             </form>
         </div>
