@@ -2,19 +2,9 @@
 
 const API_BASE_URL = '/api';
 
-function normalizePhoneNumber(phone) {
-    const trimmed = phone.trim();
-    if (/^\d{10}$/.test(trimmed)) {
-        return `+91${trimmed}`;
-    }
-    return trimmed;
-}
-
 // ============================================
 // AUTHENTICATION FUNCTIONS
 // ============================================
-
-let currentEmail = null;
 
 function switchAuthTab(tab) {
     // Hide all tabs
@@ -32,109 +22,61 @@ function switchAuthTab(tab) {
     event.target.classList.add('active');
 }
 
-async function sendEmailCode() {
+async function loginUser() {
     try {
         const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+        const password = document.getElementById('loginPassword').value;
         
-        if (!email) {
-            showAuthError('Please enter your Gmail address');
+        if (!email || !password) {
+            showAuthError('Please enter your email and password');
             return;
         }
         
-        const response = await fetch(`${API_BASE_URL}/auth/send-email-code`, {
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
+            body: JSON.stringify({ email, password })
         });
         
         const result = await response.json();
         
         if (result.status === 'success') {
-            currentEmail = email;
-            document.getElementById('emailCodeSection').classList.remove('hidden');
-            showAuthError(''); // Clear errors
-            console.log(result.message);
-        } else {
-            showAuthError(result.message || 'Error sending OTP');
-        }
-    } catch (error) {
-        showAuthError('Error: ' + error.message);
-    }
-}
-
-async function verifyEmailCode() {
-    try {
-        const email = currentEmail;
-        const code = document.getElementById('loginEmailCode').value.trim();
-        
-        if (!code || code.length !== 6) {
-            showAuthError('Please enter the 6-digit email code');
-            return;
-        }
-        
-        const response = await fetch(`${API_BASE_URL}/auth/verify-email-code`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, code })
-        });
-        
-        const result = await response.json();
-        
-        if (result.status === 'success') {
-            console.log('Login successful!', result.user);
             localStorage.setItem('email', email);
             localStorage.setItem('user', JSON.stringify(result.user));
-            
-            // Hide auth modal
             document.getElementById('authModal').classList.add('hidden');
-            
-            // Show location setup
             showLocationSetup();
         } else {
-            showAuthError(result.message || 'OTP verification failed');
+            showAuthError(result.message || 'Unable to send verification email');
         }
     } catch (error) {
         showAuthError('Error: ' + error.message);
     }
-}
-
-function resetEmailCode() {
-    document.getElementById('loginEmailCode').value = '';
-    document.getElementById('emailCodeSection').classList.add('hidden');
-    document.getElementById('loginEmail').value = '';
-    currentEmail = null;
 }
 
 async function registerUser() {
     try {
         const name = document.getElementById('regName').value.trim();
         const email = document.getElementById('regEmail').value.trim();
-        const phone = '';
+        const password = document.getElementById('regPassword').value;
         
-        if (!name || !email) {
-            showAuthError('All fields are required');
+        if (!name || !email || password.length < 8) {
+            showAuthError('Enter your name, email, and a password of at least 8 characters');
             return;
         }
         
         const response = await fetch(`${API_BASE_URL}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, phone })
+            body: JSON.stringify({ name, email, password })
         });
         
         const result = await response.json();
         
         if (result.status === 'success') {
             showAuthError('');
-            alert('Registration successful! A verification code was sent to ' + email);
-            
-            // Switch to login tab and populate phone
+            alert('Account created successfully. You can now log in.');
             switchAuthTab('login');
             document.getElementById('loginEmail').value = email;
-            
-            // Auto-send OTP
-            currentEmail = email;
-            document.getElementById('emailCodeSection').classList.remove('hidden');
         } else {
             showAuthError(result.message || 'Registration failed');
         }

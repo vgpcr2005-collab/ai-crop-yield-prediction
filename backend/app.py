@@ -10,7 +10,6 @@ import pandas as pd
 from datetime import datetime
 import os
 import sys
-from dotenv import load_dotenv
 
 # Add services to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'services'))
@@ -24,11 +23,10 @@ except ImportError as e:
     WeatherService = None
 
 try:
-    from auth_service import EmailCodeService, UserService
+    from auth_service import UserService
     print("✓ AuthService imported")
 except ImportError as e:
     print(f"⚠️ AuthService import failed: {e}")
-    EmailCodeService = None
     UserService = None
 
 try:
@@ -46,14 +44,8 @@ BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BACKEND_DIR)
 MODEL_DIR = os.path.join(BACKEND_DIR, 'models')
 DATASET_PATH = os.path.join(PROJECT_ROOT, 'dataset', 'crop_yield_data.csv')
-load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
-
 # Initialize services
-email_code_service = None
 user_service = None
-
-if EmailCodeService:
-    email_code_service = EmailCodeService()
 
 if UserService:
     try:
@@ -539,34 +531,21 @@ def calculate_crop_suitability_detailed(crop, rainfall, temperature, humidity):
     return max(10, min(100, score))
 
 # ============================================
-# AUTHENTICATION ENDPOINTS (Email Verification)
+# AUTHENTICATION ENDPOINTS (Email + Password)
 # ============================================
 
-@app.route('/api/auth/send-email-code', methods=['POST'])
-def send_email_code():
+@app.route('/api/auth/login', methods=['POST'])
+def login():
     try:
         data = request.json or {}
         email = str(data.get('email', '')).strip().lower()
-        if not email or '@' not in email:
-            return jsonify({'status': 'error', 'message': 'Valid email address is required'}), 400
-        if user_service.get_user_by_email(email)['status'] != 'success':
-            return jsonify({'status': 'error', 'message': 'Email is not registered. Please register first.'}), 404
-        return jsonify(email_code_service.generate_code(email))
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-@app.route('/api/auth/verify-email-code', methods=['POST'])
-def verify_email_code():
-    try:
-        data = request.json or {}
-        email = str(data.get('email', '')).strip().lower()
-        code = data.get('code')
-        result = email_code_service.verify_code(email, code)
+        password = str(data.get('password', ''))
+        if not email or '@' not in email or not password:
+            return jsonify({'status': 'error', 'message': 'Valid email and password are required'}), 400
+        result = user_service.authenticate_email_user(email, password)
         if result['status'] == 'success':
             session['email'] = email
             session['verified'] = True
-            user_result = user_service.get_user_by_email(email)
-            result['user'] = user_result.get('user')
         return jsonify(result)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -578,17 +557,12 @@ def register():
         data = request.json or {}
         name = data.get('name')
         email = data.get('email')
+        password = str(data.get('password', ''))
         
-        if not all([name, email]):
-            return jsonify({'status': 'error', 'message': 'Name and email are required'}), 400
+        if not name or not email or len(password) < 8:
+            return jsonify({'status': 'error', 'message': 'Name, valid email, and a password of at least 8 characters are required'}), 400
         
-        result = user_service.register_email_user(name, email)
-        
-        if result['status'] == 'success':
-            code_result = email_code_service.generate_code(email)
-            result['code_sent'] = True
-            result['code_message'] = code_result['message']
-        
+        result = user_service.register_email_user(name, email, password)
         return jsonify(result)
     
     except Exception as e:

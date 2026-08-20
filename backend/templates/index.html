@@ -26,30 +26,18 @@
             <div id="loginTab" class="auth-tab-content active">
                 <form class="auth-form" id="loginForm">
                     <div class="form-group">
-                        <label>📧 Gmail Address</label>
-                        <input type="email" id="loginEmail" placeholder="you@gmail.com" required>
+                        <label>📧 Email Address</label>
+                        <input type="email" id="loginEmail" placeholder="you@example.com" required>
                     </div>
 
-                    <button type="button" class="btn btn-primary full-width" onclick="sendEmailCode()">
-                        Send Email Code
+                    <div class="form-group">
+                        <label>🔐 Password</label>
+                        <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                    </div>
+
+                    <button type="button" class="btn btn-primary full-width" onclick="loginUser()">
+                        Login
                     </button>
-
-                    <div id="emailCodeSection" class="hidden">
-                        <div class="divider">Verification Email Sent</div>
-                        
-                        <div class="form-group">
-                            <label>🔐 Enter Verification Code</label>
-                            <input type="text" id="loginEmailCode" placeholder="000000" maxlength="6" required>
-                        </div>
-
-                        <button type="button" class="btn btn-primary full-width" onclick="verifyEmailCode()">
-                            Verify & Login
-                        </button>
-
-                        <button type="button" class="btn btn-secondary full-width" onclick="resetEmailCode()">
-                            Send New Code
-                        </button>
-                    </div>
                 </form>
             </div>
 
@@ -66,12 +54,17 @@
                         <input type="email" id="regEmail" placeholder="your@email.com" required>
                     </div>
 
+                    <div class="form-group">
+                        <label>🔐 Password</label>
+                        <input type="password" id="regPassword" minlength="8" placeholder="At least 8 characters" required>
+                    </div>
+
                     <button type="button" class="btn btn-primary full-width" onclick="registerUser()">
-                        Register & Verify Email
+                        Create Account
                     </button>
 
                     <p class="auth-info">
-                        A free verification code will be sent to your Gmail address
+                        Use your email and password to access AgriAI
                     </p>
                 </form>
             </div>
