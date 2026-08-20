@@ -10,10 +10,16 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import pickle
 import json
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATASET_PATH = PROJECT_ROOT / 'dataset' / 'crop_yield_data.csv'
+MODELS_PATH = Path(__file__).resolve().parent.parent / 'models'
+MODELS_PATH.mkdir(exist_ok=True)
 
 def load_and_prepare_data():
     """Load and prepare the dataset"""
-    df = pd.read_csv('dataset/crop_yield_data.csv')
+    df = pd.read_csv(DATASET_PATH)
     
     # Encode categorical variables
     le_crop = LabelEncoder()
@@ -25,11 +31,11 @@ def load_and_prepare_data():
     df['Soil_Type_encoded'] = le_soil.fit_transform(df['Soil_Type'])
     
     # Save label encoders
-    with open('models/crop_encoder.pkl', 'wb') as f:
+    with open(MODELS_PATH / 'crop_encoder.pkl', 'wb') as f:
         pickle.dump(le_crop, f)
-    with open('models/region_encoder.pkl', 'wb') as f:
+    with open(MODELS_PATH / 'region_encoder.pkl', 'wb') as f:
         pickle.dump(le_region, f)
-    with open('models/soil_encoder.pkl', 'wb') as f:
+    with open(MODELS_PATH / 'soil_encoder.pkl', 'wb') as f:
         pickle.dump(le_soil, f)
     
     # Features and target
@@ -42,7 +48,7 @@ def load_and_prepare_data():
     y = df['Yield_tons_per_hectare']
     
     # Save feature names
-    with open('models/feature_names.pkl', 'wb') as f:
+    with open(MODELS_PATH / 'feature_names.pkl', 'wb') as f:
         pickle.dump(feature_cols, f)
     
     return X, y, df, le_crop, le_region, le_soil
@@ -57,7 +63,7 @@ def train_models(X, y):
     X_test_scaled = scaler.transform(X_test)
     
     # Save scaler
-    with open('models/scaler.pkl', 'wb') as f:
+    with open(MODELS_PATH / 'scaler.pkl', 'wb') as f:
         pickle.dump(scaler, f)
     
     models = {}
@@ -100,7 +106,7 @@ def train_models(X, y):
     print(f"\n✓ Best Model: {best_model_name}")
     
     # Save best model
-    with open('models/yield_prediction_model.pkl', 'wb') as f:
+    with open(MODELS_PATH / 'yield_prediction_model.pkl', 'wb') as f:
         pickle.dump(best_model, f)
     
     return best_model, models, scaler
@@ -117,7 +123,7 @@ def train_crop_recommendation_model(df, le_crop):
     }).to_dict()
     
     # Save crop recommendations data
-    with open('models/crop_recommendations.json', 'w') as f:
+    with open(MODELS_PATH / 'crop_recommendations.json', 'w') as f:
         json.dump(crop_stats, f, indent=4)
     
     print("\n=== Crop Statistics ===")

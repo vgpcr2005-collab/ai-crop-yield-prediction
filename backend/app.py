@@ -1,7 +1,7 @@
 """
 Flask Backend for AI Crop Yield Prediction and Optimization System
 """
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 from flask_cors import CORS
 import pickle
 import json
@@ -9,37 +9,95 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 import os
+import sys
+
+# Add services to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'services'))
+
+# Import services with error handling
+try:
+    from weather_service import WeatherService
+    print("✓ WeatherService imported")
+except ImportError as e:
+    print(f"⚠️ WeatherService import failed: {e}")
+    WeatherService = None
+
+try:
+    from auth_service import OTPService, UserService
+    print("✓ AuthService imported")
+except ImportError as e:
+    print(f"⚠️ AuthService import failed: {e}")
+    OTPService = None
+    UserService = None
+
+try:
+    from location_service import LocationService
+    print("✓ LocationService imported")
+except ImportError as e:
+    print(f"⚠️ LocationService import failed: {e}")
+    LocationService = None
 
 app = Flask(__name__)
 CORS(app)
+app.secret_key = 'your-secret-key-change-in-production'
+
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(BACKEND_DIR)
+MODEL_DIR = os.path.join(BACKEND_DIR, 'models')
+DATASET_PATH = os.path.join(PROJECT_ROOT, 'dataset', 'crop_yield_data.csv')
+
+# Initialize services
+otp_service = None
+user_service = None
+
+if OTPService:
+    try:
+        otp_service = OTPService()
+    except Exception as e:
+        print(f"⚠️ OTPService initialization failed: {e}")
+
+if UserService:
+    try:
+        user_service = UserService()
+    except Exception as e:
+        print(f"⚠️ UserService initialization failed: {e}")
+
+# Initialize model variables
+yield_model = None
+scaler = None
+crop_encoder = None
+region_encoder = None
+soil_encoder = None
+feature_names = None
+crop_stats = None
 
 # Load models and preprocessing objects
 try:
-    with open('models/yield_prediction_model.pkl', 'rb') as f:
+    with open(os.path.join(MODEL_DIR, 'yield_prediction_model.pkl'), 'rb') as f:
         yield_model = pickle.load(f)
     
-    with open('models/scaler.pkl', 'rb') as f:
+    with open(os.path.join(MODEL_DIR, 'scaler.pkl'), 'rb') as f:
         scaler = pickle.load(f)
     
-    with open('models/crop_encoder.pkl', 'rb') as f:
+    with open(os.path.join(MODEL_DIR, 'crop_encoder.pkl'), 'rb') as f:
         crop_encoder = pickle.load(f)
     
-    with open('models/region_encoder.pkl', 'rb') as f:
+    with open(os.path.join(MODEL_DIR, 'region_encoder.pkl'), 'rb') as f:
         region_encoder = pickle.load(f)
     
-    with open('models/soil_encoder.pkl', 'rb') as f:
+    with open(os.path.join(MODEL_DIR, 'soil_encoder.pkl'), 'rb') as f:
         soil_encoder = pickle.load(f)
     
-    with open('models/feature_names.pkl', 'rb') as f:
+    with open(os.path.join(MODEL_DIR, 'feature_names.pkl'), 'rb') as f:
         feature_names = pickle.load(f)
     
-    with open('models/crop_recommendations.json', 'r') as f:
+    with open(os.path.join(MODEL_DIR, 'crop_recommendations.json'), 'r') as f:
         crop_stats = json.load(f)
     
     print("✓ All models loaded successfully")
 except Exception as e:
-    print(f"Error loading models: {e}")
-    yield_model = None
+    print(f"⚠️ Error loading models: {e}")
+    print("✅ Models will be set to defaults for testing")
 
 # Constants for optimal ranges
 OPTIMAL_RANGES = {
@@ -78,26 +136,50 @@ def index():
 def predict():
     """Predict crop yield based on input parameters"""
     try:
+        # Check if models are loaded
+        if yield_model is None:
+            return jsonify({'status': 'error', 'message': 'ML models not loaded. Please check server logs.'}), 500
+        
         data = request.json
         
-        # Extract input data
-        crop = data['crop']
-        region = data['region']
-        soil_type = data['soil_type']
-        rainfall = float(data['rainfall'])
-        temperature = float(data['temperature'])
-        humidity = float(data['humidity'])
-        nitrogen = float(data['nitrogen'])
-        phosphorus = float(data['phosphorus'])
-        potassium = float(data['potassium'])
-        area = float(data['area'])
-        irrigation = float(data['irrigation'])
-        fertilizer = float(data['fertilizer'])
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+        
+        # Extract input data with error handling
+        try:
+            crop = str(data.get('crop', '')).strip()
+            region = str(data.get('region', '')).strip()
+            soil_type = str(data.get('soil_type', '')).strip()
+            rainfall = float(data.get('rainfall', 600))
+            temperature = float(data.get('temperature', 25))
+            humidity = float(data.get('humidity', 65))
+            nitrogen = float(data.get('nitrogen', 80))
+            phosphorus = float(data.get('phosphorus', 40))
+            potassium = float(data.get('potassium', 50))
+            area = float(data.get('area', 1))
+            irrigation = float(data.get('irrigation', 3))
+            fertilizer = float(data.get('fertilizer', 100))
+        except (ValueError, TypeError) as e:
+            return jsonify({'status': 'error', 'message': f'Invalid input values: {str(e)}'}), 400
+        
+        if not all([crop, region, soil_type]):
+            return jsonify({'status': 'error', 'message': 'Crop, Region, and Soil Type are required'}), 400
         
         # Encode categorical variables
-        crop_encoded = crop_encoder.transform([crop])[0]
-        region_encoded = region_encoder.transform([region])[0]
-        soil_encoded = soil_encoder.transform([soil_type])[0]
+        try:
+            crop_encoded = crop_encoder.transform([crop])[0]
+        except ValueError:
+            return jsonify({'status': 'error', 'message': f'Invalid crop: {crop}. Must be one of: {", ".join(crop_encoder.classes_)}'}), 400
+        
+        try:
+            region_encoded = region_encoder.transform([region])[0]
+        except ValueError:
+            return jsonify({'status': 'error', 'message': f'Invalid region: {region}. Must be one of: {", ".join(region_encoder.classes_)}'}), 400
+        
+        try:
+            soil_encoded = soil_encoder.transform([soil_type])[0]
+        except ValueError:
+            return jsonify({'status': 'error', 'message': f'Invalid soil type: {soil_type}. Must be one of: {", ".join(soil_encoder.classes_)}'}), 400
         
         # Prepare features in correct order
         input_features = np.array([[
@@ -108,11 +190,17 @@ def predict():
         ]])
         
         # Scale features
-        input_scaled = scaler.transform(input_features)
+        try:
+            input_scaled = scaler.transform(input_features)
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': f'Error scaling features: {str(e)}'}), 500
         
         # Predict yield
-        predicted_yield = yield_model.predict(input_scaled)[0]
-        predicted_yield = max(0, predicted_yield)  # Ensure non-negative
+        try:
+            predicted_yield = yield_model.predict(input_scaled)[0]
+            predicted_yield = max(0, predicted_yield)  # Ensure non-negative
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': f'Prediction error: {str(e)}'}), 500
         
         # Get crop recommendations
         recommendations = generate_recommendations(crop, rainfall, temperature, humidity, 
@@ -243,7 +331,7 @@ def dashboard_data():
     """Get data for analytics dashboard"""
     try:
         # Load dataset for statistics
-        df = pd.read_csv('dataset/crop_yield_data.csv')
+        df = pd.read_csv(DATASET_PATH)
         
         # Crop-wise average yield
         crop_yield = df.groupby('Crop')['Yield_tons_per_hectare'].mean().to_dict()
@@ -450,6 +538,197 @@ def calculate_crop_suitability_detailed(crop, rainfall, temperature, humidity):
         score -= (humidity - h_max) * 0.5
     
     return max(10, min(100, score))
+
+# ============================================
+# AUTHENTICATION ENDPOINTS (Phone + OTP)
+# ============================================
+
+@app.route('/api/auth/send-otp', methods=['POST'])
+def send_otp():
+    """Send OTP to phone number"""
+    try:
+        if not otp_service:
+            return jsonify({'status': 'error', 'message': 'OTP service not initialized'}), 500
+        
+        data = request.json or {}
+        phone_number = data.get('phone')
+        
+        if not phone_number:
+            return jsonify({'status': 'error', 'message': 'Phone number is required'}), 400
+        
+        result = otp_service.generate_otp(phone_number)
+        return jsonify(result)
+    
+    except Exception as e:
+        print(f"Error in send_otp: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/auth/verify-otp', methods=['POST'])
+def verify_otp():
+    """Verify OTP and get session token"""
+    try:
+        data = request.json or {}
+        phone_number = data.get('phone')
+        otp = data.get('otp')
+        
+        if not phone_number or not otp:
+            return jsonify({'status': 'error', 'message': 'Phone and OTP are required'}), 400
+        
+        result = otp_service.verify_otp(phone_number, otp)
+        
+        if result['status'] == 'success':
+            # Create session
+            session['phone'] = phone_number
+            session['verified'] = True
+            
+            # Get user info
+            user_result = user_service.get_user(phone_number)
+            result['user'] = user_result.get('user')
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    """Register new user"""
+    try:
+        data = request.json or {}
+        phone = data.get('phone')
+        name = data.get('name')
+        email = data.get('email')
+        
+        if not all([phone, name, email]):
+            return jsonify({'status': 'error', 'message': 'Phone, name, and email are required'}), 400
+        
+        result = user_service.register_user(phone, name, email)
+        
+        if result['status'] == 'success':
+            # Send OTP after registration
+            otp_result = otp_service.generate_otp(phone)
+            result['otp_sent'] = True
+            result['otp_message'] = otp_result['message']
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/auth/get-user', methods=['GET'])
+def get_user():
+    """Get current user info"""
+    try:
+        phone = session.get('phone')
+        if not phone:
+            return jsonify({'status': 'error', 'message': 'Not authenticated'}), 401
+        
+        result = user_service.get_user(phone)
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    """Logout user"""
+    try:
+        session.clear()
+        return jsonify({'status': 'success', 'message': 'Logged out successfully'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# ============================================
+# LOCATION-BASED PARAMETER ENDPOINTS
+# ============================================
+
+@app.route('/api/location/fetch', methods=['GET', 'POST'])
+def fetch_location_data():
+    """Fetch all parameters for a location"""
+    try:
+        if request.method == 'GET':
+            location = request.args.get('location', 'Delhi')
+        else:
+            data = request.json or {}
+            location = data.get('location', 'Delhi')
+        
+        result = LocationService.get_location_data(location)
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/location/crops', methods=['GET', 'POST'])
+def get_crop_recommendations():
+    """Get recommended crops for a location"""
+    try:
+        if request.method == 'GET':
+            location = request.args.get('location', 'Delhi')
+        else:
+            data = request.json or {}
+            location = data.get('location', 'Delhi')
+        
+        result = LocationService.get_suggested_crops(location)
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/location/list', methods=['GET'])
+def list_locations():
+    """Get list of available locations"""
+    try:
+        result = LocationService.get_available_locations()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/weather', methods=['GET', 'POST'])
+def get_weather():
+    """Fetch real-time weather data and automatically populate agricultural parameters"""
+    try:
+        if request.method == 'GET':
+            # Get location from query params
+            location = request.args.get('location', 'Delhi')
+            latitude = request.args.get('latitude', type=float)
+            longitude = request.args.get('longitude', type=float)
+        else:
+            # POST request
+            data = request.json or {}
+            location = data.get('location')
+            latitude = data.get('latitude', type=float)
+            longitude = data.get('longitude', type=float)
+        
+        # Fetch weather data
+        if latitude is not None and longitude is not None:
+            weather_data = WeatherService.get_weather_for_location(latitude=latitude, longitude=longitude)
+        else:
+            weather_data = WeatherService.get_weather_for_location(location)
+        
+        if weather_data:
+            return jsonify(weather_data)
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Could not fetch weather data',
+                'default_weather': {
+                    'temperature': 25,
+                    'humidity': 60,
+                    'rainfall_mm': 600
+                }
+            }), 500
+    
+    except Exception as e:
+        print(f"Weather endpoint error: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'default_weather': {
+                'temperature': 25,
+                'humidity': 60,
+                'rainfall_mm': 600
+            }
+        }), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

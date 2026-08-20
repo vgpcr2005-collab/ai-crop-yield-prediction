@@ -19,4 +19,4 @@ COPY . .
 EXPOSE 8080
 
 # Run application
-CMD ["python", "-m", "gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "backend.app:app"]
+CMD sh -c 'exec gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 4 backend.app:app'

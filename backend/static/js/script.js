@@ -2,6 +2,282 @@
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
+// ============================================
+// AUTHENTICATION FUNCTIONS
+// ============================================
+
+let currentPhone = null;
+
+function switchAuthTab(tab) {
+    // Hide all tabs
+    document.querySelectorAll('.auth-tab-content').forEach(el => {
+        el.classList.remove('active');
+    });
+    
+    // Remove active from all buttons
+    document.querySelectorAll('.auth-tab').forEach(el => {
+        el.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById(tab + 'Tab').classList.add('active');
+    event.target.classList.add('active');
+}
+
+async function sendOTP() {
+    try {
+        const phone = document.getElementById('loginPhone').value.trim();
+        
+        if (!phone) {
+            showAuthError('Please enter a phone number');
+            return;
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/auth/send-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            currentPhone = phone;
+            document.getElementById('otpSection').classList.remove('hidden');
+            showAuthError(''); // Clear errors
+            console.log('OTP:', result.otp, '- Demo Mode (Check Console)');
+        } else {
+            showAuthError(result.message || 'Error sending OTP');
+        }
+    } catch (error) {
+        showAuthError('Error: ' + error.message);
+    }
+}
+
+async function verifyOTP() {
+    try {
+        const phone = currentPhone;
+        const otp = document.getElementById('loginOTP').value.trim();
+        
+        if (!otp || otp.length !== 6) {
+            showAuthError('Please enter a 6-digit OTP');
+            return;
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, otp })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            console.log('Login successful!', result.user);
+            localStorage.setItem('phone', phone);
+            localStorage.setItem('user', JSON.stringify(result.user));
+            
+            // Hide auth modal
+            document.getElementById('authModal').classList.add('hidden');
+            
+            // Show location setup
+            showLocationSetup();
+        } else {
+            showAuthError(result.message || 'OTP verification failed');
+        }
+    } catch (error) {
+        showAuthError('Error: ' + error.message);
+    }
+}
+
+function resetOTP() {
+    document.getElementById('loginOTP').value = '';
+    document.getElementById('otpSection').classList.add('hidden');
+    document.getElementById('loginPhone').value = '';
+    currentPhone = null;
+}
+
+async function registerUser() {
+    try {
+        const name = document.getElementById('regName').value.trim();
+        const email = document.getElementById('regEmail').value.trim();
+        const phone = document.getElementById('regPhone').value.trim();
+        
+        if (!name || !email || !phone) {
+            showAuthError('All fields are required');
+            return;
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, phone })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            showAuthError('');
+            alert('Registration successful! OTP sent to ' + phone);
+            
+            // Switch to login tab and populate phone
+            switchAuthTab('login');
+            document.getElementById('loginPhone').value = phone;
+            
+            // Auto-send OTP
+            currentPhone = phone;
+            document.getElementById('otpSection').classList.remove('hidden');
+        } else {
+            showAuthError(result.message || 'Registration failed');
+        }
+    } catch (error) {
+        showAuthError('Error: ' + error.message);
+    }
+}
+
+function showAuthError(message) {
+    const errorDiv = document.getElementById('authError');
+    if (message) {
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+    } else {
+        errorDiv.classList.add('hidden');
+    }
+}
+
+// ============================================
+// LOCATION SETUP FUNCTIONS
+// ============================================
+
+async function showLocationSetup() {
+    try {
+        // Fetch available locations
+        const response = await fetch(`${API_BASE_URL}/location/list`);
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            const select = document.getElementById('locationSelect');
+            result.locations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location;
+                option.textContent = location;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+    
+    document.getElementById('locationSection').classList.remove('hidden');
+}
+
+async function fetchLocationParameters() {
+    try {
+        const location = document.getElementById('locationSelect').value;
+        
+        if (!location) return;
+        
+        const response = await fetch(`${API_BASE_URL}/location/fetch?location=${encodeURIComponent(location)}`);
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            const params = result.agricultural_parameters;
+            
+            // Display location data
+            document.getElementById('selectedLocation').textContent = location;
+            document.getElementById('locTemp').textContent = params.temperature + '°C';
+            document.getElementById('locRainfall').textContent = params.rainfall_mm + ' mm';
+            document.getElementById('locHumidity').textContent = params.humidity + '%';
+            document.getElementById('locSoil').textContent = params.soil_type;
+            
+            document.getElementById('locationData').classList.remove('hidden');
+            
+            // Store location data
+            localStorage.setItem('location', location);
+            localStorage.setItem('locationData', JSON.stringify(result));
+        }
+    } catch (error) {
+        console.error('Error fetching location data:', error);
+    }
+}
+
+function confirmLocation() {
+    const location = document.getElementById('locationSelect').value;
+    if (!location) {
+        alert('Please select a location');
+        return;
+    }
+    
+    // Hide location section
+    document.getElementById('locationSection').classList.add('hidden');
+    
+    // Show main navigation and sections
+    document.getElementById('mainNav').classList.remove('hidden');
+    document.querySelector('.container').classList.remove('hidden');
+    
+    // Auto-populate yield prediction form with location data
+    const locationDataStr = localStorage.getItem('locationData');
+    if (locationDataStr) {
+        const locationData = JSON.parse(locationDataStr);
+        const params = locationData.agricultural_parameters;
+        
+        document.getElementById('yieldRainfall').value = Math.round(params.rainfall_mm);
+        document.getElementById('yieldTemperature').value = params.temperature;
+        document.getElementById('yieldHumidity').value = params.humidity;
+        
+        // Show notification
+        showWeatherNotification({
+            current_weather: locationData.weather,
+            location_name: location
+        });
+    }
+}
+
+function skipLocationSetup() {
+    document.getElementById('locationSection').classList.add('hidden');
+    document.getElementById('mainNav').classList.remove('hidden');
+    document.querySelector('.container').classList.remove('hidden');
+}
+
+// Initialize authentication on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is already logged in
+    const phone = localStorage.getItem('phone');
+    
+    if (phone) {
+        // User is logged in
+        console.log('User logged in:', phone);
+        document.getElementById('authModal').classList.add('hidden');
+        
+        // Show location setup or main app
+        const location = localStorage.getItem('location');
+        if (location) {
+            document.getElementById('locationSection').classList.add('hidden');
+            document.getElementById('mainNav').classList.remove('hidden');
+            document.querySelector('.container').classList.remove('hidden');
+        } else {
+            showLocationSetup();
+        }
+    } else {
+        // Show auth modal
+        document.getElementById('authModal').classList.remove('hidden');
+        document.getElementById('mainNav').classList.add('hidden');
+        document.querySelector('.container').classList.add('hidden');
+    }
+    
+    console.log('🔐 Auth system initialized');
+});
+
+function logoutUser() {
+    localStorage.removeItem('phone');
+    localStorage.removeItem('user');
+    localStorage.removeItem('location');
+    localStorage.removeItem('locationData');
+    
+    // Reload page
+    location.reload();
+}
+
 // Navigation
 document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
@@ -318,6 +594,112 @@ function displayDashboard(result) {
     
     document.getElementById('dashboardContent').scrollIntoView({ behavior: 'smooth' });
 }
+
+// ============================================
+// AUTOMATIC WEATHER DATA INTEGRATION
+// ============================================
+
+// Fetch weather data automatically on page load
+async function autoFetchWeather(location = 'Delhi') {
+    try {
+        console.log('🌦️ Fetching weather data for:', location);
+        
+        const response = await fetch(`${API_BASE_URL}/weather?location=${encodeURIComponent(location)}`);
+        
+        if (!response.ok) {
+            throw new Error('Weather API error');
+        }
+        
+        const weatherData = response.json();
+        return weatherData;
+        
+    } catch (error) {
+        console.error('Weather fetch error:', error);
+        return null;
+    }
+}
+
+// Auto-populate weather data into yield prediction form
+async function autoPopulateWeather() {
+    try {
+        // Get weather for default location (Delhi)
+        const weather = await autoFetchWeather('Delhi');
+        
+        if (weather && weather.agricultural_parameters) {
+            const params = weather.agricultural_parameters;
+            
+            // Auto-populate the form fields
+            document.getElementById('yieldRainfall').value = Math.round(params.rainfall_mm);
+            document.getElementById('yieldTemperature').value = params.temperature;
+            document.getElementById('yieldHumidity').value = params.humidity;
+            
+            console.log('✅ Weather data auto-populated:', params);
+            
+            // Show notification
+            showWeatherNotification(weather);
+        }
+    } catch (error) {
+        console.error('Auto-populate weather error:', error);
+    }
+}
+
+// Show weather notification banner
+function showWeatherNotification(weatherData) {
+    if (!weatherData.current_weather) return;
+    
+    const weather = weatherData.current_weather;
+    
+    // Create notification HTML
+    const notificationHTML = `
+        <div id="weatherNotification" class="weather-notification" style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideDown 0.5s ease-out;
+        ">
+            <div>
+                <strong>🌦️ Live Weather Data Loaded</strong><br/>
+                <small>Temperature: ${weather.temperature}°C | Humidity: ${weather.humidity}% | Wind: ${weather.wind_speed} km/h</small>
+            </div>
+            <button onclick="document.getElementById('weatherNotification').style.display='none';" style="
+                background: rgba(255,255,255,0.2);
+                border: none;
+                color: white;
+                cursor: pointer;
+                padding: 5px 10px;
+                border-radius: 4px;
+            ">✕</button>
+        </div>
+    `;
+    
+    // Insert after home section or at the beginning of yield section
+    const yieldSection = document.getElementById('yield');
+    if (yieldSection) {
+        const formContainer = yieldSection.querySelector('.form-container');
+        if (formContainer && !document.getElementById('weatherNotification')) {
+            formContainer.insertAdjacentHTML('beforebegin', notificationHTML);
+        }
+    }
+}
+
+// Initialize weather data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Page loaded - initializing automatic weather data...');
+    autoPopulateWeather();
+});
+
+// Also fetch weather when user navigates to yield prediction section
+document.addEventListener('click', function(e) {
+    if (e.target.getAttribute('data-section') === 'yield') {
+        // Re-fetch weather data
+        autoPopulateWeather();
+    }
+});
 
 // Initialize
 console.log('AgriAI Application loaded successfully!');
